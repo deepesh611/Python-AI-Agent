@@ -1,29 +1,51 @@
-import os
 import sys
+import os
 from google import genai
-from dotenv import load_dotenv
 from google.genai import types
+from dotenv import load_dotenv
+
+from prompts import system_prompt
 
 
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key)
+def main():
+    load_dotenv()
 
-user_prompt = sys.argv[1] if len(sys.argv) > 1 else print("No Prompt entered, exitting")
-flag = sys.argv[2] if len(sys.argv) > 2 else None
-messages = [
-    types.Content(role="user", parts=[types.Part(text=user_prompt)]),
-]
+    verbose = "--verbose" in sys.argv
+    args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
 
-response = client.models.generate_content(
-    model="gemini-2.0-flash-001",
-    contents=messages,
-)
+    if not args:
+        print("AI Code Assistant")
+        print('\nUsage: python main.py "your prompt here" [--verbose]')
+        print('Example: python main.py "How do I fix the calculator?"')
+        sys.exit(1)
 
-prompt_tokens = response.usage_metadata.prompt_token_count
-response_tokens = response.usage_metadata.candidates_token_count
+    api_key = os.environ.get("GEMINI_API_KEY")
+    client = genai.Client(api_key=api_key)
 
-if flag == '--verbose':
-    print(f'User prompt: {user_prompt}\nPrompt tokens: {prompt_tokens}\nResponse tokens: {response_tokens}')
-else:
-    print(f'Response :{response}')
+    user_prompt = " ".join(args)
+
+    if verbose:
+        print(f"User prompt: {user_prompt}\n")
+
+    messages = [
+        types.Content(role="user", parts=[types.Part(text=user_prompt)]),
+    ]
+
+    generate_content(client, messages, verbose)
+
+
+def generate_content(client, messages, verbose):
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-001",
+        contents=messages,
+        config=types.GenerateContentConfig(system_instruction=system_prompt),
+    )
+    if verbose:
+        print("Prompt tokens:", response.usage_metadata.prompt_token_count)
+        print("Response tokens:", response.usage_metadata.candidates_token_count)
+    print("Response:")
+    print(response.text)
+
+
+if __name__ == "__main__":
+    main()
